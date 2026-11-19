@@ -4,11 +4,12 @@ Documentation=file:%h/.local/bin/gtk-theme-sync
 After=graphical-session.target
 
 [Service]
-Type=oneshot
-ExecStart=%h/.local/bin/gtk-theme-sync
+Type=simple
+ExecStart=%h/.local/bin/gtk-theme-sync --monitor
+Restart=on-failure
+RestartSec=5
 # não bloqueia a sessão se o gsettings estiver demorando
 TimeoutStartSec=20
 
 [Install]
-# roda uma vez no login; o gtk-theme-sync.path cuida das mudanças seguintes
 WantedBy=graphical-session.target

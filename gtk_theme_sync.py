@@ -427,8 +427,7 @@ def sync_gtk_theme(dry_run=False):
     return changed
 
 
-def main():
-    dry_run = "--dry-run" in sys.argv
+def run_once(dry_run=False):
     accent = resolve_accent()
     if accent is None:
         name = gsettings("accent-color") or "?"
@@ -443,6 +442,59 @@ def main():
     if not dry_run:
         sync_flatpak_themes()
     return 0
+
+
+def monitor():
+    """Daemon: reaplica o tema/accent sempre que o color-scheme (ou accent) mudar.
+
+    O GNOME 50 redefine gtk-theme ao trocar o color-scheme; o gatilho por mtime
+    do dconf nao e confiavel. Aqui usamos `gsettings monitor`, que notifica em
+    tempo real.
+    """
+    # aplicacao inicial
+    run_once()
+    try:
+        proc = subprocess.Popen(
+            ["gsettings", "monitor", "org.gnome.desktop.interface", "color-scheme"],
+            stdout=subprocess.PIPE, text=True,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        print(f"monitor: nao foi possivel iniciar gsettings monitor: {exc}", file=sys.stderr)
+        return 1
+    # tambem monitora accent-color e gtk-theme
+    proc2 = None
+    try:
+        proc2 = subprocess.Popen(
+            ["gsettings", "monitor", "org.gnome.desktop.interface", "accent-color"],
+            stdout=subprocess.PIPE, text=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        proc2 = None
+
+    streams = [proc.stdout]
+    if proc2 is not None:
+        streams.append(proc2.stdout)
+
+    import select
+    while True:
+        readable, _, _ = select.select(streams, [], [])
+        for stream in readable:
+            try:
+                line = stream.readline()
+            except (OSError, ValueError):
+                line = ""
+            if not line:
+                continue
+            print(f"monitor: mudanca detectada ({line.strip()})")
+            run_once()
+    return 0
+
+
+def main():
+    if "--monitor" in sys.argv:
+        return monitor()
+    dry_run = "--dry-run" in sys.argv
+    return run_once(dry_run)
 
 
 if __name__ == "__main__":
