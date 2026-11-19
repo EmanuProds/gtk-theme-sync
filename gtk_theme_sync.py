@@ -327,6 +327,37 @@ def gtk_theme_for_scheme(scheme):
     return "adw-gtk3-dark" if "dark" in (scheme or "") else "adw-gtk3"
 
 
+def icon_theme_for_accent(name):
+    """Mapeia o accent do GNOME para a variante Adwaita-<cor> (adwaita-colors + MoreWaita)."""
+    if not name or not re.fullmatch(r"[a-z]+", name):
+        return None
+    candidate = f"Adwaita-{name}"
+    for base in (HOME / ".local/share/icons", pathlib.Path("/usr/share/icons")):
+        if (base / candidate / "index.theme").exists():
+            return candidate
+    return None
+
+
+def sync_icon_theme(accent_name, dry_run=False):
+    """Sincroniza o icon-theme com a variante Adwaita-<accent> (auto adwaita colors)."""
+    target = icon_theme_for_accent(accent_name)
+    if target is None:
+        print(f"icon-theme: variante Adwaita-{accent_name} ausente, pulando")
+        return False
+    current = gsettings("icon-theme")
+    if current == target:
+        print(f"icon-theme: ja estava em {target!r}")
+        return False
+    if dry_run:
+        print(f"icon-theme: (dry-run) {current!r} -> {target!r}")
+        return True
+    if gsettings_set("icon-theme", target):
+        print(f"icon-theme: {current!r} -> {target!r}")
+        return True
+    print(f"icon-theme: nao foi possivel gravar (atual {current!r})")
+    return False
+
+
 def update_settings_ini(path, theme, prefer_dark):
     """Garante gtk-theme-name e gtk-application-prefer-dark-theme no settings.ini."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -428,9 +459,10 @@ def sync_gtk_theme(dry_run=False):
 
 
 def run_once(dry_run=False):
+    accent_name = gsettings("accent-color")
     accent = resolve_accent()
     if accent is None:
-        name = gsettings("accent-color") or "?"
+        name = accent_name or "?"
         print(f"accent '{name}' nao reconhecido; nada alterado", file=sys.stderr)
         return 1
     base_hex, text_hex = accent
@@ -439,6 +471,7 @@ def run_once(dry_run=False):
     sync_zed(base_hex, text_hex, dry_run)
     sync_ghostty(base_hex, dry_run)
     sync_gtk_theme(dry_run)
+    sync_icon_theme(accent_name, dry_run)
     if not dry_run:
         sync_flatpak_themes()
     return 0
