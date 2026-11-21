@@ -40,6 +40,7 @@ ACCENTS = {
     "red": ("#e62d42", "#ff888c"),
     "pink": ("#d56199", "#ffa0d8"),
     "purple": ("#9141ac", "#fba7ff"),
+    "brown": ("#a5734b", "#d5b69a"),
     "slate": ("#6f8396", "#bbd1e5"),
 }
 
